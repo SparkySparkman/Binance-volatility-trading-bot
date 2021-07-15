@@ -1,4 +1,4 @@
-# Binance Volitility Trading Bot
+# Binance Volatility Trading Bot
 
 ## Description
 This Binance trading bot analyses the changes in price across all coins on Binance and place trades on the most volatile ones. 
