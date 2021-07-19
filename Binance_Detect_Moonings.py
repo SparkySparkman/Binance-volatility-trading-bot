@@ -393,6 +393,25 @@ def buy():
 
     return orders, last_price, volume
 
+def sell_all(msgreason, session_tspl_ovr = False):
+    global sell_all_coins
+
+    msg_discord(f'SELL ALL COINS: {msgreason}')
+
+    # stop external signals so no buying/selling/pausing etc can occur
+    stop_signal_threads()
+
+    # sell all coins NOW!
+    sell_all_coins = True
+
+    coins_sold = sell_coins(session_tspl_ovr)
+    remove_from_portfolio(coins_sold)
+
+    # display final info to screen
+    last_price = get_price()
+    discordmsg = balance_report(last_price)
+    msg_discord(discordmsg)
+
 def sell_all_coins(msg=''):
 
   with open(coins_bought_file_path, 'r') as f:
@@ -415,6 +434,9 @@ def sell_all_coins(msg=''):
 
         total_profit += profit
         total_price_change += PriceChange
+
+        coins_sold = sell_coins(session_tspl_ovr)
+        remove_from_portfolio(coins_sold)
 
         text_color = txcolors.SELL_PROFIT if PriceChange >= 0. else txcolors.SELL_LOSS
         console_log_text = f"{text_color}Sell: {coins_bought[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} Profit: {profit:.2f} {PriceChange:.2f}%{txcolors.DEFAULT}"
@@ -446,9 +468,8 @@ def sell_coins():
     for coin in list(coins_bought):
         # define stop loss and take profit
         TP = float(coins_bought[coin]['bought_at']) + (float(coins_bought[coin]['bought_at']) * coins_bought[coin]['take_profit']) / 100
-        SL = float(coins_bought[coin]['bought_at']) + (float(coins_bought[coin]['bought_at']) * coins_bought[coin]['stop_loss']) / 100
-
-
+        SL = float(coins_bought[coin]['bought_at']) + (float(coins_bought[coin]['bought_at']) * STOP_LOSS) / 100
+        #coins_bought[coin]['stop_loss']) / 100
         LastPrice = float(last_price[coin]['price'])
         BuyPrice = float(coins_bought[coin]['bought_at'])
         PriceChange = float((LastPrice - BuyPrice) / BuyPrice * 100)
@@ -523,9 +544,9 @@ def update_portfolio(orders, last_price, volume):
             'timestamp': orders[coin][0]['time'],
             'bought_at': last_price[coin]['price'],
             'volume': volume[coin],
-            'stop_loss': -STOP_LOSS,
             'take_profit': TAKE_PROFIT,
             }
+            #'stop_loss': -STOP_LOSS,
 
         # save the coins in a json file in the same directory
         with open(coins_bought_file_path, 'w') as file:
@@ -561,7 +582,7 @@ def remove_external_signals(fileext):
 def load_settings():
 
     # Load arguments then parse settings
-    mymodule = {}
+    #mymodule = {}
 
     # set to false at Start
     global bot_paused
@@ -591,6 +612,7 @@ def load_settings():
     RECHECK_INTERVAL = parsed_config['trading_options']['RECHECK_INTERVAL']
     CHANGE_IN_PRICE = parsed_config['trading_options']['CHANGE_IN_PRICE']
     STOP_LOSS = parsed_config['trading_options']['STOP_LOSS']
+    STOP_LOSS = -STOP_LOSS
     TAKE_PROFIT = parsed_config['trading_options']['TAKE_PROFIT']
     CUSTOM_LIST = parsed_config['trading_options']['CUSTOM_LIST']
     TICKERS_LIST = parsed_config['trading_options']['TICKERS_LIST']
@@ -604,10 +626,22 @@ def load_settings():
         DEBUG = True
 
 
+def load_profit(file):
+    try:
+
+        with open(file) as file:
+            return yaml.load(file, Loader=yaml.FullLoader)
+    except FileNotFoundError as fe:
+        exit(f'Could not find {file}')
+
+    except Exception as e:
+        exit(f'Encountered exception...\n {e}')
+
 if __name__ == '__main__':
 
     args = parse_args()
     DEFAULT_CREDS_FILE = 'creds.yml'
+    DEFAULT_PROFIT_FILE = 'profit.yml'
 
     load_settings()
 
@@ -639,6 +673,8 @@ if __name__ == '__main__':
 
     # try to load all the coins bought by the bot if the file exists and is not empty
     coins_bought = {}
+
+    global coins_bought_file_path
 
     # path to the saved coins_bought file
     coins_bought_file_path = 'coins_bought.json'
@@ -686,6 +722,7 @@ if __name__ == '__main__':
 
     # load signalling modules
     signalthreads = []
+    mymodule = {}
     try:
         if len(SIGNALLING_MODULES) > 0:
             for module in SIGNALLING_MODULES:
@@ -737,6 +774,14 @@ if __name__ == '__main__':
                 # sell all coins
                 sell_all_coins('Program execution ended by user!')
                 #os.system('python sell-remaining-coins.py')
+                coins_bought = {}
+                print(f'Removing file and resetting session profit : ',coins_bought_file_path)
+                os.remove(coins_bought_file_path)
+                if os.path.isfile(coins_bought_file_path):
+                  with open(coins_bought_file_path) as file:
+                    coins_bought = json.load(file)
+
+
                 print(f'Program execution ended by user and all held coins sold !')
                 print(f'Amount of held coins left : ',len(coins_bought))
                 print(f'')
