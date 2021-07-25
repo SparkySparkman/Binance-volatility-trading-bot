@@ -141,8 +141,8 @@ def print_stats():
   print(f'--------')
   print(f'Started         : {bot_started_datetime} | Run time : {datetime.now() - bot_started_datetime}')
   print(f'Coins Currently : {len(coins_bought)}/{MAX_COINS} ({float(len(coins_bought)*QUANTITY):g}/{float(MAX_COINS*QUANTITY):g} {PAIR_WITH})')
-  print(f'SL              : {STOP_LOSS}%')
-  print(f'TP              : {TAKE_PROFIT}%')
+  print(f'Stop Loss       : {STOP_LOSS}%')
+  print(f'Take Profit     : {TAKE_PROFIT}%')
   print(f'--------')
   print(f'')
 
@@ -413,7 +413,7 @@ def sell_all(msgreason, session_tspl_ovr = False):
     msg_discord(discordmsg)
 
 def sell_all_coins(msg=''):
-
+  global session_tspl_ovr
   with open(coins_bought_file_path, 'r') as f:
     coins_bought = json.load(f)
     total_profit = 0
@@ -468,8 +468,8 @@ def sell_coins():
     for coin in list(coins_bought):
         # define stop loss and take profit
         TP = float(coins_bought[coin]['bought_at']) + (float(coins_bought[coin]['bought_at']) * coins_bought[coin]['take_profit']) / 100
-        SL = float(coins_bought[coin]['bought_at']) + (float(coins_bought[coin]['bought_at']) * STOP_LOSS) / 100
-        #coins_bought[coin]['stop_loss']) / 100
+        SL = float(coins_bought[coin]['bought_at']) + (float(coins_bought[coin]['bought_at']) * coins_bought[coin]['stop_loss']) / 100
+
         LastPrice = float(last_price[coin]['price'])
         BuyPrice = float(coins_bought[coin]['bought_at'])
         PriceChange = float((LastPrice - BuyPrice) / BuyPrice * 100)
@@ -480,12 +480,12 @@ def sell_coins():
             # increasing TP by TRAILING_TAKE_PROFIT (essentially next time to readjust SL)
             coins_bought[coin]['take_profit'] = PriceChange + TRAILING_TAKE_PROFIT
             coins_bought[coin]['stop_loss'] = coins_bought[coin]['take_profit'] - TRAILING_STOP_LOSS
-            if DEBUG: print(f"{coin} TP reached, adjusting TP {coins_bought[coin]['take_profit']:.2f}  and SL {coins_bought[coin]['stop_loss']:.2f} accordingly to lock-in profit")
+            if DEBUG: print(f"{coin} TP reached, adjusting TP {coins_bought[coin]['take_profit']:.2f}  and SL {coins_bought[coin]['stop_loss']:.2f} accordingly to lock-in profit, , SL {SL}, TP {TP}")
             continue
 
         # check that the price is below the stop loss or above take profit (if trailing stop loss not used) and sell if this is the case
-        if LastPrice < SL or LastPrice > TP and not USE_TRAILING_STOP_LOSS:
-            print(f"{txcolors.SELL_PROFIT if PriceChange >= 0. else txcolors.SELL_LOSS}TP or SL reached, selling {coins_bought[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} : {PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}")
+        if ((LastPrice < SL or LastPrice > TP) and not USE_TRAILING_STOP_LOSS) or (LastPrice < SL and USE_TRAILING_STOP_LOSS):
+            print(f"{txcolors.SELL_PROFIT if PriceChange >= 0. else txcolors.SELL_LOSS}TP or SL reached, selling {coins_bought[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} : {PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}, SL {SL}, TP {TP}")
 
             if (LastPrice+TRADING_FEE) >= (BuyPrice+TRADING_FEE):
                 trade_wins += 1
@@ -526,7 +526,10 @@ def sell_coins():
         # no action; print once every TIME_DIFFERENCE
         if hsp_head == 1:
             if len(coins_bought) > 0:
-                print(f'TP or SL not yet reached, not selling {coin} for now {BuyPrice} - {LastPrice} : {txcolors.SELL_PROFIT if PriceChange >= 0. else txcolors.SELL_LOSS}{PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}')
+                print(f'TP or SL not yet reached, not selling {coin} for now {BuyPrice} - {LastPrice} : {txcolors.SELL_PROFIT if PriceChange >= 0.0 else txcolors.SELL_LOSS}{PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}, SL ',coins_bought[coin]['stop_loss'],'%')
+
+                coins_bought[coin]['take_profit'] = TAKE_PROFIT
+                if coins_bought[coin]['stop_loss'] < 0: coins_bought[coin]['stop_loss'] = STOP_LOSS
 
     if hsp_head == 1 and len(coins_bought) == 0: print(f'Not holding any coins')
 
@@ -545,8 +548,8 @@ def update_portfolio(orders, last_price, volume):
             'bought_at': last_price[coin]['price'],
             'volume': volume[coin],
             'take_profit': TAKE_PROFIT,
+            'stop_loss': STOP_LOSS,
             }
-            #'stop_loss': -STOP_LOSS,
 
         # save the coins in a json file in the same directory
         with open(coins_bought_file_path, 'w') as file:
@@ -612,7 +615,6 @@ def load_settings():
     RECHECK_INTERVAL = parsed_config['trading_options']['RECHECK_INTERVAL']
     CHANGE_IN_PRICE = parsed_config['trading_options']['CHANGE_IN_PRICE']
     STOP_LOSS = parsed_config['trading_options']['STOP_LOSS']
-    STOP_LOSS = -STOP_LOSS
     TAKE_PROFIT = parsed_config['trading_options']['TAKE_PROFIT']
     CUSTOM_LIST = parsed_config['trading_options']['CUSTOM_LIST']
     TICKERS_LIST = parsed_config['trading_options']['TICKERS_LIST']
@@ -642,6 +644,7 @@ if __name__ == '__main__':
     args = parse_args()
     DEFAULT_CREDS_FILE = 'creds.yml'
     DEFAULT_PROFIT_FILE = 'profit.yml'
+    mainnet_wait = 10
 
     load_settings()
 
@@ -699,8 +702,10 @@ if __name__ == '__main__':
 
     if not TEST_MODE:
         if not args.notimeout: # if notimeout skip this (fast for dev tests)
-            print('WARNING: You are using the Mainnet and live funds. Waiting 20 seconds as a security measure')
-            time.sleep(20)
+            print('WARNING: You are using the Mainnet and live funds. Waiting',mainnet_wait,'seconds as a security measure')
+            time.sleep(mainnet_wait)
+        else:
+            print('You are using Test Mode')
 
     signals = glob.glob("signals/*.exs")
     for filename in signals:
@@ -772,18 +777,19 @@ if __name__ == '__main__':
             if sellall == "Y":
                 bot_paused = True
                 # sell all coins
-                sell_all_coins('Program execution ended by user!')
-                #os.system('python sell-remaining-coins.py')
+                #sell_all_coins('Program execution ended by user!')
+                os.system('python sell-remaining-coins.py')
                 coins_bought = {}
                 print(f'Removing file and resetting session profit : ',coins_bought_file_path)
-                os.remove(coins_bought_file_path)
                 if os.path.isfile(coins_bought_file_path):
-                  with open(coins_bought_file_path) as file:
-                    coins_bought = json.load(file)
+                  os.remove(coins_bought_file_path)
+                  coins_bought = {}
+                  #with open(coins_bought_file_path) as file:
+                    #coins_bought = json.load(file)
 
 
                 print(f'Program execution ended by user and all held coins sold !')
-                print(f'Amount of held coins left : ',len(coins_bought))
+                #print(f'Amount of held coins left : ',len(coins_bought))
                 print(f'')
 
             sys.exit(0)
