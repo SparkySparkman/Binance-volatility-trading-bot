@@ -72,12 +72,17 @@ class txcolors:
 
 
 # tracks profit/loss each session
-global session_profit, trade_wins, trade_losses, sellall
+global session_profit, trade_wins, trade_losses, sellall, PriceChange, Pending_sum, Pending_perc, WIN_LOSS_PERCENT
+
 session_profit = 0
 bot_started_datetime = datetime.now()
 trade_wins = 0
 trade_losses = 0
 sellall = ''
+PriceChange = 0.0
+Pending_sum = 0.0
+Pending_perc = 0.0
+WIN_LOSS_PERCENT = 0.0
 
 # print with timestamps
 old_out = sys.stdout
@@ -116,7 +121,6 @@ def get_price(add_to_historical=True):
 
     initial_price = {}
     prices = client.get_all_tickers()
-
     for coin in prices:
 
         if CUSTOM_LIST:
@@ -136,13 +140,26 @@ def get_price(add_to_historical=True):
 
     return initial_price
 
-def print_stats():
+def print_stats(PriceChange,Pending_sum,Pending_perc):
+  if trade_wins+trade_losses > 0:
+    Profit_Per_Trade = (session_profit/(trade_wins+trade_losses))
+  else:
+    Profit_Per_Trade = 0
   print(f'')
   print(f'--------')
+  print(f'')
+  print(f'Working...')
+  print(f'Test mode        : ',TEST_MODE)
+  print(f'Session profit   : {txcolors.SELL_PROFIT if session_profit > 0. else txcolors.SELL_LOSS}{session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}, ~{Profit_Per_Trade:.2f}% per trade {txcolors.DEFAULT}')
+  print(f'Pending profit  : {txcolors.SELL_PROFIT if Pending_sum > 0. else txcolors.SELL_LOSS} {Pending_sum:.2f}%, {Pending_perc:.2f} USDT{txcolors.DEFAULT}')
+  print(f'Overall profit  : {txcolors.SELL_PROFIT if session_profit+Pending_perc > 0. else txcolors.SELL_LOSS} {(session_profit+Pending_perc):.2f}%, {(QUANTITY * (session_profit+Pending_sum))/100:.2f} USDT')
+  print(f'Trades total ',trade_wins+trade_losses,', Wins ',trade_wins,', Losses ',trade_losses,', Win ratio ',WIN_LOSS_PERCENT,'%')
   print(f'Started         : {bot_started_datetime} | Run time : {datetime.now() - bot_started_datetime}')
   print(f'Coins Currently : {len(coins_bought)}/{MAX_COINS} ({float(len(coins_bought)*QUANTITY):g}/{float(MAX_COINS*QUANTITY):g} {PAIR_WITH})')
   print(f'Stop Loss       : {STOP_LOSS}%')
   print(f'Take Profit     : {TAKE_PROFIT}%')
+  print('Use TSL         :',USE_TRAILING_STOP_LOSS, end = ', ')
+  if USE_TRAILING_STOP_LOSS: print('TSL ',TRAILING_STOP_LOSS,'%, TTP ',TRAILING_TAKE_PROFIT,'%')
   print(f'--------')
   print(f'')
 
@@ -151,7 +168,7 @@ def wait_for_price():
     '''calls the initial price and ensures the correct amount of time has passed
     before reading the current price again'''
 
-    global historical_prices, hsp_head, volatility_cooloff
+    global historical_prices, hsp_head, volatility_cooloff, WIN_LOSS_PERCENT
 
     volatile_coins = {}
     externals = {}
@@ -159,6 +176,7 @@ def wait_for_price():
     coins_up = 0
     coins_down = 0
     coins_unchanged = 0
+    WIN_LOSS_PERCENT = 0
 
     pause_bot()
 
@@ -168,18 +186,13 @@ def wait_for_price():
         time.sleep((timedelta(minutes=float(TIME_DIFFERENCE / RECHECK_INTERVAL)) - (datetime.now() - historical_prices[hsp_head]['BNB' + PAIR_WITH]['time'])).total_seconds())
 
     # truncating some of the above values to the correct decimal places before printing
-    WIN_LOSS_PERCENT = 0
     if (trade_wins > 0) and (trade_losses > 0):
         WIN_LOSS_PERCENT = round((trade_wins / (trade_wins+trade_losses)) * 100, 2)
     if (trade_wins > 0) and (trade_losses == 0):
         WIN_LOSS_PERCENT = 100
-    print(f'')
-    print(f'Working...Session profit : {session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}')
-    print(f'Trades total ',trade_wins+trade_losses,', Wins ',trade_wins,', Losses ',trade_losses,', Win ratio ',WIN_LOSS_PERCENT,'%')
+    #print(f'Wins :  {trade_wins}, Losses :  {trade_losses}, {WIN_LOSS_PERCENT}% ')
 
-    print(f'Test mode : ',TEST_MODE)
-
-    print_stats()
+    print_stats(PriceChange,Pending_sum,Pending_perc)
 
     load_settings()
 
@@ -275,8 +288,9 @@ def pause_bot():
         # pausing here
         if hsp_head == 1:
           print(f'')
-          print(f'Paused...Session profit : {session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}')
-          print_stats()
+          print(f'Paused...')
+          #Session profit : {session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}')
+          print_stats(PriceChange,Pending_sum,Pending_perc)
           time.sleep((TIME_DIFFERENCE * 60) / RECHECK_INTERVAL)
 
     else:
@@ -394,7 +408,7 @@ def buy():
     return orders, last_price, volume
 
 def sell_all(msgreason, session_tspl_ovr = False):
-    global sell_all_coins
+    global sell_all_coins, PriceChange
 
     msg_discord(f'SELL ALL COINS: {msgreason}')
 
@@ -446,6 +460,8 @@ def sell_all_coins(msg=''):
             timestamp = datetime.now().strftime("%d/%m %H:%M:%S")
             write_log(f"Sell: {coins_bought[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} Profit: {profit:.2f} {PriceChange:.2f}%")
 
+    total_profit = profit + Pending_sum
+    total_price_change = PriceChange + Pending_perc
     text_color = txcolors.SELL_PROFIT if total_price_change >= 0. else txcolors.SELL_LOSS
     print(f"Total Profit: {text_color}{total_profit:.2f}{txcolors.DEFAULT}. Total Price Change: {text_color}{total_price_change:.2f}%{txcolors.DEFAULT}")
 
@@ -459,11 +475,15 @@ def sell_all_coins(msg=''):
 def sell_coins():
     '''sell coins that have reached the STOP LOSS or TAKE PROFIT threshold'''
 
-    global hsp_head, session_profit, trade_wins, trade_losses
+    global hsp_head, session_profit, trade_wins, trade_losses, Pending_sum, Pending_perc, PriceChange
+
+    Pending_sum = 0.0
+    Pending_perc = 0.0
 
     last_price = get_price(False) # don't populate rolling window
     #last_price = get_price(add_to_historical=True) # don't populate rolling window
     coins_sold = {}
+    #print(f'')
 
     for coin in list(coins_bought):
         # define stop loss and take profit
@@ -473,6 +493,8 @@ def sell_coins():
         LastPrice = float(last_price[coin]['price'])
         BuyPrice = float(coins_bought[coin]['bought_at'])
         PriceChange = float((LastPrice - BuyPrice) / BuyPrice * 100)
+        Pending_perc += PriceChange-(TRADING_FEE*2)
+        Pending_sum += (QUANTITY*(PriceChange-(TRADING_FEE*2)))/100
 
         # check that the price is above the take profit and readjust SL and TP accordingly if trialing stop loss used
         if LastPrice > TP and USE_TRAILING_STOP_LOSS:
@@ -532,7 +554,7 @@ def sell_coins():
                 if coins_bought[coin]['stop_loss'] < 0: coins_bought[coin]['stop_loss'] = STOP_LOSS
 
     if hsp_head == 1 and len(coins_bought) == 0: print(f'Not holding any coins')
-
+    #print(f'')
     return coins_sold
 
 
@@ -789,7 +811,6 @@ if __name__ == '__main__':
 
 
                 print(f'Program execution ended by user and all held coins sold !')
-                #print(f'Amount of held coins left : ',len(coins_bought))
                 print(f'')
 
             sys.exit(0)
