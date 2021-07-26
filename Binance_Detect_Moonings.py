@@ -149,17 +149,17 @@ def print_stats(PriceChange,Pending_sum,Pending_perc):
   print(f'--------')
   print(f'')
   print(f'Working...')
-  print(f'Test mode        : ',TEST_MODE)
-  print(f'Session profit   : {txcolors.SELL_PROFIT if session_profit > 0. else txcolors.SELL_LOSS}{session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}, ~{Profit_Per_Trade:.2f}% per trade {txcolors.DEFAULT}')
-  print(f'Pending profit  : {txcolors.SELL_PROFIT if Pending_sum > 0. else txcolors.SELL_LOSS} {Pending_sum:.2f}%, {Pending_perc:.2f} USDT{txcolors.DEFAULT}')
-  print(f'Overall profit  : {txcolors.SELL_PROFIT if session_profit+Pending_perc > 0. else txcolors.SELL_LOSS} {(session_profit+Pending_perc):.2f}%, {(QUANTITY * (session_profit+Pending_sum))/100:.2f} USDT')
-  print(f'Trades total ',trade_wins+trade_losses,', Wins ',trade_wins,', Losses ',trade_losses,', Win ratio ',WIN_LOSS_PERCENT,'%')
+  print(f'Test mode       :',TEST_MODE)
+  print(f'Session profit  : {txcolors.SELL_PROFIT if session_profit > 0. else txcolors.SELL_LOSS}{session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}, ~{Profit_Per_Trade:.2f}% per trade {txcolors.DEFAULT}')
+  print(f'Pending profit  :{txcolors.SELL_PROFIT if Pending_sum > 0. else txcolors.SELL_LOSS} {Pending_sum:.2f}%, {Pending_perc:.2f} USDT{txcolors.DEFAULT}')
+  print(f'Overall profit  :{txcolors.SELL_PROFIT if session_profit+Pending_perc > 0. else txcolors.SELL_LOSS} {(session_profit+Pending_perc):.2f}%, {(QUANTITY * (session_profit+Pending_sum))/100:.2f} USDT')
+  print(f'Trades total    : {trade_wins+trade_losses}, Wins {trade_wins}, Losses {trade_losses}, Win ratio {WIN_LOSS_PERCENT}%')
   print(f'Started         : {bot_started_datetime} | Run time : {datetime.now() - bot_started_datetime}')
   print(f'Coins Currently : {len(coins_bought)}/{MAX_COINS} ({float(len(coins_bought)*QUANTITY):g}/{float(MAX_COINS*QUANTITY):g} {PAIR_WITH})')
   print(f'Stop Loss       : {STOP_LOSS}%')
   print(f'Take Profit     : {TAKE_PROFIT}%')
   print('Use TSL         :',USE_TRAILING_STOP_LOSS, end = ', ')
-  if USE_TRAILING_STOP_LOSS: print('TSL ',TRAILING_STOP_LOSS,'%, TTP ',TRAILING_TAKE_PROFIT,'%')
+  if USE_TRAILING_STOP_LOSS: print(f'TSL {TRAILING_STOP_LOSS}%, TTP {TRAILING_TAKE_PROFIT}%')
   print(f'--------')
   print(f'')
 
@@ -811,6 +811,7 @@ if __name__ == '__main__':
 
 
                 print(f'Program execution ended by user and all held coins sold !')
+                #print(f'Amount of held coins left : ',len(coins_bought))
                 print(f'')
 
             sys.exit(0)
