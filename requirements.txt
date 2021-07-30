@@ -2,4 +2,3 @@ python-binance==1.0.12
 colorama==0.4.4
 PyYAML==5.4.1
 tradingview-ta==3.2.3
-your requirements.txt has an error
