@@ -71,19 +71,6 @@ class txcolors:
     DEFAULT = '\033[39m'
 
 
-# tracks profit/loss each session
-global session_profit, trade_wins, trade_losses, sellall, PriceChange, Pending_sum, Pending_perc, WIN_LOSS_PERCENT
-
-session_profit = 0
-bot_started_datetime = datetime.now()
-trade_wins = 0
-trade_losses = 0
-sellall = ''
-PriceChange = 0.0
-Pending_sum = 0.0
-Pending_perc = 0.0
-WIN_LOSS_PERCENT = 0.0
-
 # print with timestamps
 old_out = sys.stdout
 class St_ampe_dOut:
@@ -104,6 +91,23 @@ class St_ampe_dOut:
         pass
 
 sys.stdout = St_ampe_dOut()
+
+# tracks profit/loss each session
+global session_profit, trade_wins, trade_losses, sellall, PriceChange, Pending_sum, Pending_perc
+global WIN_LOSS_PERCENT, coins_up, coins_down, coins_unchanged
+
+session_profit = 0
+bot_started_datetime = datetime.now()
+trade_wins = 0
+trade_losses = 0
+sellall = ''
+PriceChange = 0.0
+Pending_sum = 0.0
+Pending_perc = 0.0
+WIN_LOSS_PERCENT = 0.0
+coins_up = 0
+coins_down = 0
+coins_unchanged = 0
 
 def stop_signal_threads():
 
@@ -140,7 +144,7 @@ def get_price(add_to_historical=True):
 
     return initial_price
 
-def print_stats(PriceChange,Pending_sum,Pending_perc):
+def print_stats(PriceChange,Pending_sum,Pending_perc,coins_up,coins_down,coins_unchanged):
   if trade_wins+trade_losses > 0:
     Profit_Per_Trade = (session_profit/(trade_wins+trade_losses))
   else:
@@ -151,15 +155,17 @@ def print_stats(PriceChange,Pending_sum,Pending_perc):
   print(f'Working...')
   print(f'Test mode       :',TEST_MODE)
   print(f'Session profit  : {txcolors.SELL_PROFIT if session_profit > 0. else txcolors.SELL_LOSS}{session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}, ~{Profit_Per_Trade:.2f}% per trade {txcolors.DEFAULT}')
-  print(f'Pending profit  :{txcolors.SELL_PROFIT if Pending_sum > 0. else txcolors.SELL_LOSS} {Pending_sum:.2f}%, {Pending_perc:.2f} USDT{txcolors.DEFAULT}')
-  print(f'Overall profit  :{txcolors.SELL_PROFIT if session_profit+Pending_perc > 0. else txcolors.SELL_LOSS} {(session_profit+Pending_perc):.2f}%, {(QUANTITY * (session_profit+Pending_sum))/100:.2f} USDT')
+  print(f'Pending profit  :{txcolors.SELL_PROFIT if Pending_perc > 0. else txcolors.SELL_LOSS} {Pending_perc:.2f}%, {Pending_sum:.2f} USDT{txcolors.DEFAULT}')
+  print(f'Overall profit  :{txcolors.SELL_PROFIT if session_profit+Pending_perc > 0. else txcolors.SELL_LOSS} {(session_profit+Pending_perc):.2f}%, {(QUANTITY * (session_profit+Pending_perc))/100:.2f} USDT')
   print(f'Trades total    : {trade_wins+trade_losses}, Wins {trade_wins}, Losses {trade_losses}, Win ratio {WIN_LOSS_PERCENT}%')
   print(f'Started         : {bot_started_datetime} | Run time : {datetime.now() - bot_started_datetime}')
   print(f'Coins Currently : {len(coins_bought)}/{MAX_COINS} ({float(len(coins_bought)*QUANTITY):g}/{float(MAX_COINS*QUANTITY):g} {PAIR_WITH})')
+  print(f'Coin\'s Status   : {txcolors.SELL_PROFIT}Up {coins_up}, {txcolors.SELL_LOSS}Down: {coins_down}{txcolors.DEFAULT}, Unchanged: {coins_unchanged}')
   print(f'Stop Loss       : {STOP_LOSS}%')
   print(f'Take Profit     : {TAKE_PROFIT}%')
-  print('Use TSL         :',USE_TRAILING_STOP_LOSS, end = ', ')
-  if USE_TRAILING_STOP_LOSS: print(f'TSL {TRAILING_STOP_LOSS}%, TTP {TRAILING_TAKE_PROFIT}%')
+  print('Use TSL         :',USE_TRAILING_STOP_LOSS, end = '')
+  if USE_TRAILING_STOP_LOSS: print(f', TSL {TRAILING_STOP_LOSS}%, TTP {TRAILING_TAKE_PROFIT}%')
+  else: print(f'')
   print(f'--------')
   print(f'')
 
@@ -169,6 +175,7 @@ def wait_for_price():
     before reading the current price again'''
 
     global historical_prices, hsp_head, volatility_cooloff, WIN_LOSS_PERCENT
+    global coins_up,coins_down,coins_unchanged
 
     volatile_coins = {}
     externals = {}
@@ -176,6 +183,7 @@ def wait_for_price():
     coins_up = 0
     coins_down = 0
     coins_unchanged = 0
+
     WIN_LOSS_PERCENT = 0
 
     pause_bot()
@@ -191,8 +199,6 @@ def wait_for_price():
     if (trade_wins > 0) and (trade_losses == 0):
         WIN_LOSS_PERCENT = 100
     #print(f'Wins :  {trade_wins}, Losses :  {trade_losses}, {WIN_LOSS_PERCENT}% ')
-
-    print_stats(PriceChange,Pending_sum,Pending_perc)
 
     load_settings()
 
@@ -232,9 +238,6 @@ def wait_for_price():
         else:
             coins_unchanged +=1
 
-    # Disabled until fix
-    #print(f'Up: {coins_up} Down: {coins_down} Unchanged: {coins_unchanged}')
-
     # Here goes new code for external signalling
     externals = external_signals()
     exnumber = 0
@@ -245,6 +248,8 @@ def wait_for_price():
             volatile_coins[excoin] = 1
             exnumber +=1
             print(f'External signal received on {excoin}, calculating volume in {PAIR_WITH}')
+
+    print_stats(PriceChange,Pending_sum,Pending_perc,coins_up,coins_down,coins_unchanged)
 
     return volatile_coins, len(volatile_coins), historical_prices[hsp_head]
 
@@ -290,7 +295,7 @@ def pause_bot():
           print(f'')
           print(f'Paused...')
           #Session profit : {session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}')
-          print_stats(PriceChange,Pending_sum,Pending_perc)
+          print_stats(PriceChange,Pending_sum,Pending_perc,coins_up,coins_down,coins_unchanged)
           time.sleep((TIME_DIFFERENCE * 60) / RECHECK_INTERVAL)
 
     else:
@@ -403,14 +408,14 @@ def buy():
 
 
         else:
-            print(f'Signal detected, but there is already an active trade on {coin}')
+            print(f'Buy signal detected, but there is already an active trade on {coin}')
 
     return orders, last_price, volume
 
 def sell_all(msgreason, session_tspl_ovr = False):
     global sell_all_coins, PriceChange
 
-    msg_discord(f'SELL ALL COINS: {msgreason}')
+    #msg_discord(f'SELL ALL COINS: {msgreason}')
 
     # stop external signals so no buying/selling/pausing etc can occur
     stop_signal_threads()
@@ -460,8 +465,10 @@ def sell_all_coins(msg=''):
             timestamp = datetime.now().strftime("%d/%m %H:%M:%S")
             write_log(f"Sell: {coins_bought[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} Profit: {profit:.2f} {PriceChange:.2f}%")
 
-    total_profit = profit + Pending_sum
-    total_price_change = PriceChange + Pending_perc
+    total_profit += Pending_sum
+    total_price_change += Pending_perc
+    print(f'')
+    print(f'Pending Profit: {Pending_perc}%, {Pending_sum} USDT')
     text_color = txcolors.SELL_PROFIT if total_price_change >= 0. else txcolors.SELL_LOSS
     print(f"Total Profit: {text_color}{total_profit:.2f}{txcolors.DEFAULT}. Total Price Change: {text_color}{total_price_change:.2f}%{txcolors.DEFAULT}")
 
