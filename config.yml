@@ -4,7 +4,7 @@ script_options:
   # Setting this to False will use REAL funds, use at your own risk
   # I don't advice to change TEST_MODE while the bot is running. I haven't tested what it does
   # when the bot changes from test mode to use real money all of a sudden or vice versa
-  TEST_MODE: True
+  TEST_MODE: False
   LOG_TRADES: True
   LOG_FILE: 'trades.txt'
   DEBUG: False
@@ -39,11 +39,12 @@ trading_options:
   TICKERS_LIST: 'tickers.txt'
 
    # Maximum number of coints to hold
-   # Set this to zero if you want the bot to sell all the(possibly losind at the moment) coins. If you want to avoid losses, then set your STOP_LOSS high enough
+   # Set this to zero if you want the bot to sell all the(possibly losing at the moment) coins at TP.
+   #If you want to avoid losses, then set your STOP_LOSS high enough
    # Set this to -1 if you want the bot stop automatically when all the coins are sold
-  MAX_COINS: 10
+  MAX_COINS: 11
 
-  # the amount of time in MINUTES to calculate the differnce from the current price
+  # the amount of time in MINUTES to calculate the difference from the current price
   TIME_DIFFERENCE: 1
 
   # Numer of times to check for TP/SL during each TIME_DIFFERENCE Minimum 1
@@ -53,7 +54,7 @@ trading_options:
   CHANGE_IN_PRICE: 0.25
 
   # define in % when to sell a coin that's not making a profit, this has to be NEGATIVE number
-  STOP_LOSS: -10
+  STOP_LOSS: -80
 
   # define in % when to take profit on a profitable coin
   TAKE_PROFIT: 1.0
