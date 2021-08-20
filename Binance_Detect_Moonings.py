@@ -159,7 +159,11 @@ def print_stats(PriceChange,Pending_sum,Pending_perc,coins_up,coins_down,coins_u
   print(f'Overall profit  :{txcolors.SELL_PROFIT if session_profit+Pending_perc > 0. else txcolors.SELL_LOSS} {(session_profit+Pending_perc):.2f}%, {(QUANTITY * (session_profit+Pending_perc))/100:.2f} USDT')
   print(f'Trades total    : {trade_wins+trade_losses}, Wins {trade_wins}, Losses {trade_losses}, Win ratio {WIN_LOSS_PERCENT}%')
   print(f'Started         : {bot_started_datetime} | Run time : {datetime.now() - bot_started_datetime}')
-  print(f'Coins Currently : {len(coins_bought)}/{MAX_COINS} ({float(len(coins_bought)*QUANTITY):g}/{float(MAX_COINS*QUANTITY):g} {PAIR_WITH})')
+  if MAX_COINS > 0:
+    print(f'Coins Currently : {len(coins_bought)}/{MAX_COINS} ({float(len(coins_bought)*QUANTITY):g}/{float(MAX_COINS*QUANTITY):g} {PAIR_WITH})')
+  else:
+    print(f'Coins Currently : {len(coins_bought)}/0 ({float(len(coins_bought)*QUANTITY):g}/0 {PAIR_WITH})')
+
   print(f'Coin\'s Status   : {txcolors.SELL_PROFIT}Up {coins_up}, {txcolors.SELL_LOSS}Down: {coins_down}{txcolors.DEFAULT}, Unchanged: {coins_unchanged}')
   print(f'Stop Loss       : {STOP_LOSS}%')
   print(f'Take Profit     : {TAKE_PROFIT}%')
@@ -205,6 +209,21 @@ def wait_for_price():
     # retreive latest prices
     get_price()
 
+    if MAX_COINS < 1:
+      print(f'')
+      print(f'{txcolors.WARNING}Your MAX_COINS is set to zero or below, no coins will be bought.')
+      print(f'{txcolors.WARNING}If you want the bot to buy some coins, set MAX_COINS > 0 and save settings file !')
+
+    if MAX_COINS == -1:
+      print(f'')
+      print(f'{txcolors.WARNING}The bot is set to terminate when all the coins are sold')
+      if len(coins_bought) == 0:
+        print(f'')
+        print(f'{txcolors.WARNING}All the coins are sold, terminating the bot now')
+        # stop external signal threads
+        stop_signal_threads()
+        sys.exit(0)
+
     # calculate the difference in prices
     for coin in historical_prices[hsp_head]:
 
@@ -225,12 +244,13 @@ def wait_for_price():
             if datetime.now() >= volatility_cooloff[coin] + timedelta(minutes=TIME_DIFFERENCE):
                 volatility_cooloff[coin] = datetime.now()
 
-                if len(coins_bought) + len(volatile_coins) < MAX_COINS or MAX_COINS == 0:
+                if len(coins_bought) + len(volatile_coins) < MAX_COINS: #  or MAX_COINS == 0
                     volatile_coins[coin] = round(threshold_check, 3)
                     print(f'{coin} has gained {volatile_coins[coin]}% within the last {TIME_DIFFERENCE} minute(s), calculating volume in {PAIR_WITH}')
 
                 else:
-                    print(f'{txcolors.WARNING}{coin} has gained {round(threshold_check, 3)}% within the last {TIME_DIFFERENCE} minute(s), but you are holding max number of coins{txcolors.DEFAULT}')
+                    if MAX_COINS > 0:
+                      print(f'{txcolors.WARNING}{coin} has gained {round(threshold_check, 3)}% within the last {TIME_DIFFERENCE} minute(s), but you are holding max number of coins{txcolors.DEFAULT}')
 
         elif threshold_check < CHANGE_IN_PRICE:
             coins_down +=1
