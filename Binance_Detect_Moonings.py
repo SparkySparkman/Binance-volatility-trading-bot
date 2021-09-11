@@ -15,6 +15,8 @@ or others connected with the program.
 
 # use for environment variables
 import os
+import math
+from decimal import Decimal
 
 # use if needed to pass args to external modules
 import sys
@@ -149,11 +151,17 @@ def print_stats(PriceChange,Pending_sum,Pending_perc,coins_up,coins_down,coins_u
     Profit_Per_Trade = (session_profit/(trade_wins+trade_losses))
   else:
     Profit_Per_Trade = 0
+
   print(f'')
   print(f'--------')
   print(f'')
   print(f'Working...')
-  print(f'Test mode       :',TEST_MODE)
+
+  if TEST_MODE:
+    print(f'Mode            : Test mode')
+  else:
+    print(f'Mode            : {txcolors.WARNING}You are using REAL money!')
+
   print(f'Session profit  : {txcolors.SELL_PROFIT if session_profit > 0. else txcolors.SELL_LOSS}{session_profit:.2f}% Est : ${(QUANTITY * session_profit)/100:.2f}, ~{Profit_Per_Trade:.2f}% per trade {txcolors.DEFAULT}')
   print(f'Pending profit  :{txcolors.SELL_PROFIT if Pending_perc > 0. else txcolors.SELL_LOSS} {Pending_perc:.2f}%, {Pending_sum:.2f} USDT{txcolors.DEFAULT}')
   print(f'Overall profit  :{txcolors.SELL_PROFIT if session_profit+Pending_perc > 0. else txcolors.SELL_LOSS} {(session_profit+Pending_perc):.2f}%, {(QUANTITY * (session_profit+Pending_perc))/100:.2f} USDT')
@@ -211,12 +219,12 @@ def wait_for_price():
 
     if MAX_COINS < 1:
       print(f'')
-      print(f'{txcolors.WARNING}Your MAX_COINS is set to zero or below, no coins will be bought.')
-      print(f'{txcolors.WARNING}If you want the bot to buy some coins, set MAX_COINS > 0 and save settings file !')
+      print(f'{txcolors.WARNING}MAX_COINS is set to zero or below({MAX_COINS}), no coins will be bought.')
+      print(f'{txcolors.WARNING}If you want the bot to buy more coins, set MAX_COINS > {len(coins_bought) if len(coins_bought) > 0. else 0} and save settings file !')
 
     if MAX_COINS == -1:
       print(f'')
-      print(f'{txcolors.WARNING}The bot is set to terminate when all the coins are sold')
+      print(f'{txcolors.WARNING}The bot is set to terminate after all the coins are sold')
       if len(coins_bought) == 0:
         print(f'')
         print(f'{txcolors.WARNING}All the coins are sold, terminating the bot now')
@@ -370,6 +378,20 @@ def convert_volume():
 
     return volume, last_price
 
+def dropzeros(number):
+    mynum = Decimal(number).normalize()
+    # e.g 22000 --> Decimal('2.2E+4')
+    return mynum.__trunc__() if not mynum % 1 else float(mynum)
+
+def remove_zeros(num):
+    nums = list(num)
+    indexes = (list(reversed(range(len(nums)))))
+    for i in indexes:
+        if nums[i] == '0':
+            del nums[-1]
+        else:
+            break
+    return "".join(nums)
 
 def buy():
     '''Place Buy market orders for each volatile coin found'''
@@ -380,6 +402,7 @@ def buy():
 
         # only buy if the there are no active trades on the coin
         if coin not in coins_bought:
+            volume[coin] = math.floor(volume[coin]*100000)/100000
             print(f"{txcolors.BUY}Preparing to buy {volume[coin]} {coin}{txcolors.DEFAULT}")
 
             if TEST_MODE:
@@ -523,7 +546,7 @@ def sell_coins():
         Pending_perc += PriceChange-(TRADING_FEE*2)
         Pending_sum += (QUANTITY*(PriceChange-(TRADING_FEE*2)))/100
 
-        # check that the price is above the take profit and readjust SL and TP accordingly if trialing stop loss used
+        # check that the price is above the take profit and readjust SL and TP accordingly if trailing stop loss used
         if LastPrice > TP and USE_TRAILING_STOP_LOSS:
 
             # increasing TP by TRAILING_TAKE_PROFIT (essentially next time to readjust SL)
@@ -534,13 +557,7 @@ def sell_coins():
 
         # check that the price is below the stop loss or above take profit (if trailing stop loss not used) and sell if this is the case
         if ((LastPrice < SL or LastPrice > TP) and not USE_TRAILING_STOP_LOSS) or (LastPrice < SL and USE_TRAILING_STOP_LOSS):
-            print(f"{txcolors.SELL_PROFIT if PriceChange >= 0. else txcolors.SELL_LOSS}TP or SL reached, selling {coins_bought[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} : {PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}, SL {SL}, TP {TP}")
-
-            if (LastPrice+TRADING_FEE) >= (BuyPrice+TRADING_FEE):
-                trade_wins += 1
-            else:
-                trade_losses += 1
-
+            print(f"{txcolors.SELL_PROFIT if PriceChange >= 0. else txcolors.SELL_LOSS}TP or SL reached, selling {coins_bought[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} : {PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}, SL {SL:.2f}, TP {TP:.2f}")
 
             # try to create a real order
             try:
@@ -565,9 +582,15 @@ def sell_coins():
                 # prevent system from buying this coin for the next TIME_DIFFERENCE minutes
                 volatility_cooloff[coin] = datetime.now()
 
+                if (LastPrice+TRADING_FEE) >= (BuyPrice+TRADING_FEE):
+                  trade_wins += 1
+                else:
+                  trade_losses += 1
+
                 # Log trade
                 if LOG_TRADES:
-                    profit = ((LastPrice - BuyPrice) * coins_sold[coin]['volume'])* (1-(TRADING_FEE*2)) # adjust for trading fee here
+                    # adjust for trading fee here
+                    profit = ((LastPrice - BuyPrice) * coins_sold[coin]['volume'])* (1-(TRADING_FEE*2))
                     write_log(f"Sell: {coins_sold[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} Profit: {profit:.2f} {PriceChange-(TRADING_FEE*2):.2f}%")
                     session_profit=session_profit + (PriceChange-(TRADING_FEE*2))
             continue
@@ -575,7 +598,7 @@ def sell_coins():
         # no action; print once every TIME_DIFFERENCE
         if hsp_head == 1:
             if len(coins_bought) > 0:
-                print(f'TP or SL not yet reached, not selling {coin} for now {BuyPrice} - {LastPrice} : {txcolors.SELL_PROFIT if PriceChange >= 0.0 else txcolors.SELL_LOSS}{PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}, SL ',coins_bought[coin]['stop_loss'],'%')
+                print(f"TP or SL not yet reached, not selling {coin} for now {BuyPrice} - {LastPrice} : {txcolors.SELL_PROFIT if PriceChange >= 0.0 else txcolors.SELL_LOSS}{PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}, SL {coins_bought[coin]['stop_loss']:.2f}%")
 
                 coins_bought[coin]['take_profit'] = TAKE_PROFIT
                 if coins_bought[coin]['stop_loss'] < 0: coins_bought[coin]['stop_loss'] = STOP_LOSS
