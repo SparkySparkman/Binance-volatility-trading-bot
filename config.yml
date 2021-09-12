@@ -4,7 +4,7 @@ script_options:
   # Setting this to False will use REAL funds, use at your own risk
   # I don't advice to change TEST_MODE while the bot is running. I haven't tested what it does
   # when the bot changes from test mode to use real money all of a sudden or vice versa
-  TEST_MODE: False
+  TEST_MODE: True
   LOG_TRADES: True
   LOG_FILE: 'trades.txt'
   DEBUG: False
