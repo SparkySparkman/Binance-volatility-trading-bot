@@ -36,25 +36,26 @@ trading_options:
     - UP
 
   # Name of custom tickers list
-  TICKERS_LIST: 'tickers.txt'
+  #TICKERS_LIST: 'tickers.txt'
+  TICKERS_LIST: 'tickers_all_USDT.txt'
 
    # Maximum number of coints to hold
    # Set this to zero if you want the bot to sell all the(possibly losing at the moment) coins at TP.
-   #If you want to avoid losses, then set your STOP_LOSS high enough
-   # Set this to -1 if you want the bot stop automatically when all the coins are sold
-  MAX_COINS: 11
+   # If you want to avoid losses, then set your STOP_LOSS high enough
+   # Set this to -1 if you want the bot to terminate automatically when all the coins are sold
+  MAX_COINS: 18
 
   # the amount of time in MINUTES to calculate the difference from the current price
   TIME_DIFFERENCE: 1
 
   # Numer of times to check for TP/SL during each TIME_DIFFERENCE Minimum 1
-  RECHECK_INTERVAL: 3
+  RECHECK_INTERVAL: 6
 
   # the difference in % between the first and second checks for the price.
-  CHANGE_IN_PRICE: 0.25
+  CHANGE_IN_PRICE: 90
 
   # define in % when to sell a coin that's not making a profit, this has to be NEGATIVE number
-  STOP_LOSS: -80
+  STOP_LOSS: -90
 
   # define in % when to take profit on a profitable coin
   TAKE_PROFIT: 1.0
@@ -68,8 +69,18 @@ trading_options:
   # when hit TAKE_PROFIT, move STOP_LOSS to TRAILING_STOP_LOSS percentage points below TAKE_PROFIT hence locking in profit
   # when hit TAKE_PROFIT, move TAKE_PROFIT up by TRAILING_TAKE_PROFIT percentage points
   # TRAILING_STOP_LOSS should be be greater than TRAILING_TAKE_PROFIT
-  TRAILING_STOP_LOSS: 0.3
-  TRAILING_TAKE_PROFIT: 0.2
+  TRAILING_STOP_LOSS: 0.2
+  TRAILING_TAKE_PROFIT: 0.1
+
+  # EX_PAIRS is a list of fiat currencies and margin symbols that I am excluding.
+  # Anything added here will be excluded from coin withdrawal and will not be sold.
+  EX_PAIRS: ['EUR', 'USD', 'GBP', 'BUSD', 'USDT', 'AUD', 'BRL', 'RUB', 'TRY', 'USDC', 'PAX', 'BIDR', 'DAI', 'IDRT',
+  'UAH', 'NGN', 'VAI', 'BVND', 'JPY', 'NCASH', 'UPUSDT', 'DOWNUSDT', 'USDTUP', 'USDTDOWN', 'BNBDOWN',
+  'EOSDOWN', 'XLMDOWN', 'UNIDOWN', 'LINKDOWN', 'FILDOWN', 'TRXDOWN', 'XRPDOWN', 'AAVEDOWN', 'SUSHIDOWN',
+  'XTZDOWN', 'ADADOWN', '1INCHDOWN', 'BTCDOWN', 'SXPDOWN', 'DOTDOWN', 'ETHDOWN', 'BCHDOWN', 'LTCDOWN',
+  'YFIDOWN', 'XTZUP', 'DOTUP', 'ADAUP', 'SUPER', 'AAVEUP', 'BTCUP', 'BNBUP', 'SXPUP', 'YFIUP', 'XLMUP',
+  'UNIUP', 'FILUP', '1INCHUP', 'LINKUP', 'LTCUP', 'ETHUP', 'SUSHIUP', 'EOSUP', 'XRPUP', 'TRXUP', 'BCHUP',
+  'RENBTC', 'B' ]
 
   # Trading fee in % per trade.
   # If using 0.075% (using BNB for fees) you must have BNB in your account to cover trading fees.
@@ -77,10 +88,10 @@ trading_options:
   TRADING_FEE: 0.075
 
   SIGNALLING_MODULES:
-  #  - pausebotmod
-    - signalsamplemod
-    - custsignalmod
+    - pausebotmod
+    - VolScan
+  #  - signalsamplemod
+  #  - custsignalmod
   #  - os_pausebot_MAv2
   #  - djcommie_signalsell_rsi_stoch
   #  - djcommie_signalbuy_rsi_stoch
-
