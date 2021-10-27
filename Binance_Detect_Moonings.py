@@ -157,8 +157,12 @@ def print_stats(PriceChange,Pending_sum,Pending_perc,coins_up,coins_down,coins_u
   print(f'')
   print(f'Working...')
 
+  # https://algotrading101.com/learn/binance-python-api-guide/
+  # Gets all the coin balances on Binance
+  # print(client.get_account())
+
   if TEST_MODE:
-    print(f'Mode            : Test mode')
+    print(f'Mode            : Test mode, {txcolors.SELL_PROFIT}no real money is used')
   else:
     print(f'Mode            : {txcolors.WARNING}You are using REAL money!')
 
@@ -166,6 +170,7 @@ def print_stats(PriceChange,Pending_sum,Pending_perc,coins_up,coins_down,coins_u
   print(f'Pending profit  :{txcolors.SELL_PROFIT if Pending_perc > 0. else txcolors.SELL_LOSS} {Pending_perc:.2f}%, {Pending_sum:.2f} USDT{txcolors.DEFAULT}')
   print(f'Overall profit  :{txcolors.SELL_PROFIT if session_profit+Pending_perc > 0. else txcolors.SELL_LOSS} {(session_profit+Pending_perc):.2f}%, {(QUANTITY * (session_profit+Pending_perc))/100:.2f} USDT')
   print(f'Trades total    : {trade_wins+trade_losses}, Wins {trade_wins}, Losses {trade_losses}, Win ratio {WIN_LOSS_PERCENT}%')
+  print('Last sell       :',last_sell_datetime)
   print(f'Started         : {bot_started_datetime} | Run time : {datetime.now() - bot_started_datetime}')
   if MAX_COINS > 0:
     print(f'Coins Currently : {len(coins_bought)}/{MAX_COINS} ({float(len(coins_bought)*QUANTITY):g}/{float(MAX_COINS*QUANTITY):g} {PAIR_WITH})')
@@ -178,6 +183,13 @@ def print_stats(PriceChange,Pending_sum,Pending_perc,coins_up,coins_down,coins_u
   print('Use TSL         :',USE_TRAILING_STOP_LOSS, end = '')
   if USE_TRAILING_STOP_LOSS: print(f', TSL {TRAILING_STOP_LOSS}%, TTP {TRAILING_TAKE_PROFIT}%')
   else: print(f'')
+  print('Used sig. mod(s):', end=" ")
+  if len(SIGNALLING_MODULES) > 0:
+    #for module in SIGNALLING_MODULES:
+      #print(module, end=" ")
+    print(*tuple(module for module in SIGNALLING_MODULES))
+  #print(f'')
+  print(f'')
   print(f'--------')
   print(f'')
 
@@ -402,7 +414,7 @@ def buy():
 
         # only buy if the there are no active trades on the coin
         if coin not in coins_bought:
-            volume[coin] = math.floor(volume[coin]*100000)/100000
+            volume[coin] = math.floor(volume[coin]*10000)/10000
             print(f"{txcolors.BUY}Preparing to buy {volume[coin]} {coin}{txcolors.DEFAULT}")
 
             if TEST_MODE:
@@ -525,7 +537,7 @@ def sell_all_coins(msg=''):
 def sell_coins():
     '''sell coins that have reached the STOP LOSS or TAKE PROFIT threshold'''
 
-    global hsp_head, session_profit, trade_wins, trade_losses, Pending_sum, Pending_perc, PriceChange
+    global hsp_head, session_profit, trade_wins, trade_losses, Pending_sum, Pending_perc, PriceChange, last_sell_datetime
 
     Pending_sum = 0.0
     Pending_perc = 0.0
@@ -559,6 +571,7 @@ def sell_coins():
         if ((LastPrice < SL or LastPrice > TP) and not USE_TRAILING_STOP_LOSS) or (LastPrice < SL and USE_TRAILING_STOP_LOSS):
             print(f"{txcolors.SELL_PROFIT if PriceChange >= 0. else txcolors.SELL_LOSS}TP or SL reached, selling {coins_bought[coin]['volume']} {coin} - {BuyPrice} - {LastPrice} : {PriceChange-(TRADING_FEE*2):.2f}% Est:${(QUANTITY*(PriceChange-(TRADING_FEE*2)))/100:.2f}{txcolors.DEFAULT}, SL {SL:.2f}, TP {TP:.2f}")
 
+            last_sell_datetime = datetime.now()
             # try to create a real order
             try:
 
@@ -749,7 +762,9 @@ if __name__ == '__main__':
     # try to load all the coins bought by the bot if the file exists and is not empty
     coins_bought = {}
 
-    global coins_bought_file_path
+    global coins_bought_file_path, last_sell_datetime
+
+    last_sell_datetime = "Never"
 
     # path to the saved coins_bought file
     coins_bought_file_path = 'coins_bought.json'
